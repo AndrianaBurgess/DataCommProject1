@@ -5,7 +5,12 @@
 #include <netinet/in.h> 
 #include <string.h> 
 #include <unistd.h>
+#include <sys/stat.h>
+
 #define PORT 9080 
+#define FILE_INDEX 3
+#define TO_FORMAT_INDEX 4
+#define NEW_NAME_INDEX 5
    
 int main(int argc, char const *argv[]) 
 { 
@@ -28,6 +33,8 @@ int main(int argc, char const *argv[])
     }
     fclose(fp);
 
+    int s = size_of_message(argv[FILE_INDEX], argv[NEW_NAME_INDEX] );
+    printf("%d",s);
 
     return 0;
 
@@ -65,3 +72,11 @@ int main(int argc, char const *argv[])
     printf("%s\n",buffer ); 
     return 0; 
 } 
+
+int size_of_message(char* file, char* new__file_name){
+    struct stat st;
+    stat(file, &st);
+    int file_size = st.st_size;
+    int name_size = strlen(new__file_name);
+    return(3+8+1+file_size+name_size);
+}
