@@ -4,10 +4,33 @@
 #include <stdlib.h> 
 #include <netinet/in.h> 
 #include <string.h> 
+#include <unistd.h>
 #define PORT 9080 
    
 int main(int argc, char const *argv[]) 
 { 
+    if(atoi(argv[4]) > 3 || atoi(argv[4]) < 0){
+        puts("To Format number is invalid. Must be between 0 and 3");
+        exit(1);
+    }
+    if( access(argv[3], F_OK ) == -1 ) {
+        puts("File does not exist");
+        exit(1);
+    }
+    FILE *fp = fopen( argv[3],"r" );
+    fseek(fp, 0, SEEK_SET);
+    char data[1];
+    int tot = fread(data, sizeof(data[0]), 1, fp);
+    if (0 == tot) {
+        fclose(fp);
+        puts("File is empty");
+        exit(1);
+    }
+    fclose(fp);
+
+
+    return 0;
+
     struct sockaddr_in address; 
     int sock = 0, valread; 
     struct sockaddr_in serv_addr; 
