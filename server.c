@@ -1,5 +1,3 @@
-
-// Server side C/C++ program to demonstrate Socket programming 
 #include <unistd.h> 
 #include <stdio.h> 
 #include <sys/socket.h> 
@@ -8,6 +6,8 @@
 #include <string.h>
 
 #define PORT 9080 
+
+void no_translation(char file_name[], uint64_t file_size, char file_content[]);
 
 int main(int argc, char const *argv[]) 
 { 
@@ -29,7 +29,6 @@ int main(int argc, char const *argv[])
     address.sin_addr.s_addr = INADDR_ANY; 
     address.sin_port = htons( PORT ); 
        
-    // Forcefully attaching socket to the port 8080 
     if (bind(server_fd, (struct sockaddr *)&address,  
                                  sizeof(address))<0) 
     { 
@@ -78,6 +77,8 @@ int main(int argc, char const *argv[])
         printf("%d\n", to_format);
         fflush(stdout);
 
+        no_translation(name,content_bytes,content);
+
 
         if(close(new_socket)<0){
             perror("Socket Close Failure");
@@ -91,3 +92,45 @@ int main(int argc, char const *argv[])
     printf("Hello message sent\n"); 
     return 0; 
 } 
+
+void no_translation(char file_name[], uint64_t file_size, char file_content[]){
+    FILE *fptr;
+    fptr = fopen(file_name,"wb");
+    int i = 0;
+
+    while(i < file_size){
+        char type = file_content[i++];
+        if (type == 0){
+            int amount = file_content[i++];
+            fprintf(fptr,"%d ",amount);
+            int j;
+            for(j=0; j < amount-1 ; j++){
+                char first = file_content[i++];
+                char second = file_content[i++];
+                short num = ((short)first << 8) | (short)second;
+                fprintf(fptr,"%d ",num);
+            }
+            char first = file_content[i++];
+            char second = file_content[i++];
+            short num = ((short)first << 8) | (short)second;
+            fprintf(fptr,"%d",num);
+            fprintf(fptr,"%c",'\n');
+        }else{
+            fprintf(fptr,"%s ","hey");
+            char amount_s[3];
+            amount_s[0] = file_content[i++];
+            amount_s[1] = file_content[i++];
+            amount_s[2] = file_content[i++];
+            int amount = atoi(amount_s);
+            fprintf(fptr,"%d ",amount);
+            int k;
+            while(file_content[i]!= 1 || file_content[i]!= 0){
+                fprintf(fptr,"%c",file_content[i++]);
+            }
+            fprintf(fptr,"%c",'\n');
+
+        }
+    }
+
+    fclose(fptr);
+}
