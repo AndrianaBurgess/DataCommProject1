@@ -1,4 +1,3 @@
-// Client side C/C++ program to demonstrate Socket programming 
 #include <stdio.h> 
 #include <sys/socket.h> 
 #include <stdlib.h> 
@@ -7,6 +6,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <inttypes.h>
+#include <arpa/inet.h>
 
 #define PORT 9080 
 #define FILE_INDEX 3
@@ -14,8 +14,10 @@
 #define NEW_NAME_INDEX 5
 #define NAME_SIZE_BYTES 4
 #define CONTENT_SIZE_BYTES 8
+
+int size_of_message(char* file, char* new__file_name);
    
-int main(int argc, char const *argv[]) 
+int main(int argc, char *argv[]) 
 { 
     if(atoi(argv[4]) > 3 || atoi(argv[4]) < 0){
         puts("To Format number is invalid. Must be between 0 and 3");
@@ -71,31 +73,41 @@ int main(int argc, char const *argv[])
     char *curr = message;
     //Add size of new file name to message 
     uint32_t name_size = strlen(argv[NEW_NAME_INDEX]);
+    printf("Name size: %d\n", name_size);
     name_size = htonl(name_size);
     memcpy(curr,&name_size,NAME_SIZE_BYTES);
     name_size = ntohl(name_size);
     curr += NAME_SIZE_BYTES;
     //Add new file name to message
+    printf("Name: %s\n", argv[NEW_NAME_INDEX]);
     memcpy(curr,argv[NEW_NAME_INDEX],name_size);
     curr += name_size;
     //Add size of file content to message
     struct stat st;
     stat(argv[FILE_INDEX], &st);
     uint64_t file_size = st.st_size;
+    printf("File size: %d\n", file_size);
     file_size = htonl(file_size);
     memcpy(curr,&file_size,CONTENT_SIZE_BYTES);
     file_size = ntohl(file_size);
     curr += CONTENT_SIZE_BYTES;
     //Add content of file to message 
     FILE *file = fopen(argv[FILE_INDEX],"r");
-    curr += fread(curr,1,file_size,file);
+    int trans = fread(curr,1,file_size,file);
+    curr += trans;
+    printf("Byts transferred: %d\n", trans);
     fclose(file);
     //Add to format num to message 
-    uint8_t to_format = argv[TO_FORMAT_INDEX];
+    uint8_t to_format = atoi(argv[TO_FORMAT_INDEX]);
+    printf("client to format %d\n",to_format);
+    //to_format = htons(to_format);
     memcpy(curr,&to_format,1);
 
-    send(sock , message , s , 0 ); 
-    printf("Hello message sent\n"); 
+    printf("to name: %d\n", message[s - 1]);
+
+    write(sock , message , s);
+    printf("Bytes sent: %d\n", s); 
+    
     char rec[40];
     valread = read( sock , rec, 1024); 
     printf("%s\n",rec ); 
