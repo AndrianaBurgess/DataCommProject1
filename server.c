@@ -7,7 +7,7 @@
 
 #define PORT 9080 
 
-void no_translation(char file_name[], uint64_t file_size, char file_content[]);
+void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 
 int main(int argc, char const *argv[]) 
 { 
@@ -53,7 +53,7 @@ int main(int argc, char const *argv[])
         printf("%d\n", name_bytes);
         fflush(stdout);
 
-        char *name = malloc(name_bytes+1); 
+        unsigned char *name = malloc(name_bytes+1); 
         name[name_bytes] = '\0';
         recv(new_socket, name, name_bytes, MSG_WAITALL);
         printf("%s\n", name);
@@ -65,7 +65,7 @@ int main(int argc, char const *argv[])
         printf("%d\n", content_bytes);
         fflush(stdout);
 
-        char *content = malloc(content_bytes+1); 
+        unsigned char *content = malloc(content_bytes+1); 
         content[content_bytes] = '\0';
         recv(new_socket, content, content_bytes, MSG_WAITALL);
         printf("%s\n", content);
@@ -93,38 +93,38 @@ int main(int argc, char const *argv[])
     return 0; 
 } 
 
-void no_translation(char file_name[], uint64_t file_size, char file_content[]){
+void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]){
     FILE *fptr;
-    fptr = fopen(file_name,"wb");
+    fptr = fopen(file_name,"w");
     int i = 0;
+    printf("file size: %d\n",file_size);
 
     while(i < file_size){
-        char type = file_content[i++];
+        unsigned char type = file_content[i++];
         if (type == 0){
             int amount = file_content[i++];
             fprintf(fptr,"%d ",amount);
             int j;
             for(j=0; j < amount-1 ; j++){
-                char first = file_content[i++];
-                char second = file_content[i++];
-                short num = ((short)first << 8) | (short)second;
+                unsigned char first = file_content[i++];
+                unsigned char second = file_content[i++];
+                unsigned short num = (((unsigned short)first) << 8) | ((unsigned short)second);
                 fprintf(fptr,"%d ",num);
             }
-            char first = file_content[i++];
-            char second = file_content[i++];
-            short num = ((short)first << 8) | (short)second;
-            fprintf(fptr,"%d",num);
-            fprintf(fptr,"%c",'\n');
+            unsigned char first = file_content[i++];
+            unsigned char second = file_content[i++];
+            unsigned short num = ((unsigned short)first << 8) | (unsigned short)second;
+            fprintf(fptr,"%d\n",num);
+            
         }else{
-            fprintf(fptr,"%s ","hey");
-            char amount_s[3];
+            unsigned char amount_s[3];
             amount_s[0] = file_content[i++];
             amount_s[1] = file_content[i++];
             amount_s[2] = file_content[i++];
             int amount = atoi(amount_s);
             fprintf(fptr,"%d ",amount);
             int k;
-            while(file_content[i]!= 1 || file_content[i]!= 0){
+            while(file_content[i]!= 1 && file_content[i]!= 0){
                 fprintf(fptr,"%c",file_content[i++]);
             }
             fprintf(fptr,"%c",'\n');
