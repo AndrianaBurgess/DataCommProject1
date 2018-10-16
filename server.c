@@ -4,17 +4,26 @@
 #include <stdlib.h> 
 #include <netinet/in.h> 
 #include <string.h>
+#include <stdbool.h>
+
 
 #define PORT 9080 
 const int NO_TRANS = 0;
 const int ZERO_TO_ONE = 1;
 const int ONE_TO_ZERO = 2;
 const int SWAP = 3;
+const int FORMAT_ZERO_AMOUNT_SIZE = 1;
+const int FORMAT_ZERO_NUM_SIZE = 2;
+const int FORMAT_ONE_AMOUNT_SIZE = 3;
+const char* FORMAT_ERROR_MESSAGE = "Format Error";
+const char* SUCCESS_MESSAGE = "Success";
+const int FOMRAT_ONE_AMOUNT_SIZE = 3;
 
 void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 void zero_to_one(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
+bool is_valid_file(unsigned char file_content[], uint64_t file_size);
 
 int main(int argc, char const *argv[]) 
 { 
@@ -69,7 +78,7 @@ int main(int argc, char const *argv[])
         total_read += strlen(name);
 
         uint64_t content_bytes;  
-        recv(new_socket, &content_bytes, sizeof(content_bytes), MSG_WAITALL);
+        int b = recv(new_socket, &content_bytes, sizeof(content_bytes), MSG_WAITALL);
         content_bytes = ntohl(content_bytes);
         printf("contnt bytes: %d\n", content_bytes);
         fflush(stdout);
@@ -89,6 +98,13 @@ int main(int argc, char const *argv[])
         fflush(stdout);
         total_read += 1;
 
+        if (!is_valid_file(content, content_bytes)){
+            write(new_socket, FORMAT_ERROR_MESSAGE, strlen(FORMAT_ERROR_MESSAGE) );
+        }
+        else{
+
+        write(new_socket, SUCCESS_MESSAGE, strlen(SUCCESS_MESSAGE));
+
         printf("Total bytes read: %d\n", total_read);
         if (to_format == NO_TRANS){
             no_translation(name,content_bytes,content);
@@ -100,6 +116,7 @@ int main(int argc, char const *argv[])
             one_to_zero(name,content_bytes,content);
         }else if(to_format == SWAP){
             swap(name,content_bytes,content);
+        }
         }
         
 
@@ -294,4 +311,44 @@ void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_cont
     }
 
     fclose(fptr);
+}
+
+
+
+bool is_valid_file(unsigned char file_content[], uint64_t file_size){
+
+    unsigned char* current = file_content;
+    unsigned char* end_of_file = file_content + file_size;
+
+    while (current < end_of_file){
+
+        uint8_t format = *current;
+        current++;
+
+        if (format != 0 && format != 1){ 
+            return false;
+        }
+
+        if (format == 0){
+            current += FORMAT_ZERO_AMOUNT_SIZE + *current * FORMAT_ZERO_NUM_SIZE;
+        } else {
+            char amount_as_ascii[FORMAT_ONE_AMOUNT_SIZE];
+            memcpy(amount_as_ascii, current, FORMAT_ONE_AMOUNT_SIZE);
+            uint8_t amount = atoi(amount_as_ascii);
+            current += FORMAT_ONE_AMOUNT_SIZE;
+            for (int i = 0; i < amount - 1; i++){
+                unsigned char* comma_ptr = strchr(current, ',');
+                if (comma_ptr == NULL){
+                    return false;
+                }
+                int difference = comma_ptr - current;
+                current += difference + 1; // go to 1 past comma
+            }
+
+            while (*current != 0 && *current != 1){ // iterate until finding next format byte
+                current++;
+            }
+        }
+    }
+    return current == end_of_file;
 }

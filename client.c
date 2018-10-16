@@ -68,39 +68,36 @@ int main(int argc, char *argv[])
     } 
 
     int s = size_of_message(argv[FILE_INDEX], argv[NEW_NAME_INDEX] );
-    printf("%d",s);
     char *message = malloc(s);
     char *curr = message;
     //Add size of new file name to message 
     uint32_t name_size = strlen(argv[NEW_NAME_INDEX]);
-    printf("Name size: %d\n", name_size);
     name_size = htonl(name_size);
     memcpy(curr,&name_size,NAME_SIZE_BYTES);
     name_size = ntohl(name_size);
     curr += NAME_SIZE_BYTES;
+    
     //Add new file name to message
-    printf("Name: %s\n", argv[NEW_NAME_INDEX]);
     memcpy(curr,argv[NEW_NAME_INDEX],name_size);
     curr += name_size;
+
     //Add size of file content to message
     struct stat st;
     stat(argv[FILE_INDEX], &st);
     uint64_t file_size = st.st_size;
-    printf("File size: %d\n", file_size);
     file_size = htonl(file_size);
     memcpy(curr,&file_size,CONTENT_SIZE_BYTES);
     file_size = ntohl(file_size);
     curr += CONTENT_SIZE_BYTES;
+
     //Add content of file to message 
     FILE *file = fopen(argv[FILE_INDEX],"r");
     int trans = fread(curr,1,file_size,file);
     curr += trans;
-    printf("Byts transferred: %d\n", trans);
     fclose(file);
+
     //Add to format num to message 
     uint8_t to_format = atoi(argv[TO_FORMAT_INDEX]);
-    printf("client to format %d\n",to_format);
-    //to_format = htons(to_format);
     memcpy(curr,&to_format,1);
 
     printf("to name: %d\n", message[s - 1]);
