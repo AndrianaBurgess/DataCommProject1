@@ -13,6 +13,8 @@ const int SWAP = 3;
 
 void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 void zero_to_one(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
+void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
+void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 
 int main(int argc, char const *argv[]) 
 { 
@@ -83,28 +85,23 @@ int main(int argc, char const *argv[])
         uint8_t to_format;
         recv(new_socket, &to_format, 1, MSG_WAITALL);
         printf("to format before: %d\n", to_format);
-       // to_format = ntohs(to_format);
         printf("to format: %d\n", to_format);
         fflush(stdout);
         total_read += 1;
 
         printf("Total bytes read: %d\n", total_read);
         if (to_format == NO_TRANS){
-            printf("%s\n", "WHOOORESSSS");
             no_translation(name,content_bytes,content);
 
         }else if(to_format == ZERO_TO_ONE){
-            printf("%s\n", "BITCHESSSSSSSS");
             zero_to_one(name,content_bytes,content);
 
         }else if(to_format == ONE_TO_ZERO){
-            printf("%d\n", to_format);
+            one_to_zero(name,content_bytes,content);
         }else if(to_format == SWAP){
-            printf("%d\n", to_format);
+            swap(name,content_bytes,content);
         }
         
-
-
 
         if(close(new_socket)<0){
             perror("Socket Close Failure");
@@ -194,6 +191,102 @@ void zero_to_one(unsigned char file_name[], uint64_t file_size, unsigned char fi
             int k;
             while(file_content[i]!= 1 && file_content[i]!= 0){
                 fprintf(fptr,"%c",file_content[i++]);
+            }
+            fprintf(fptr,"%c",'\n');
+
+        }
+    }
+
+    fclose(fptr);
+}
+
+void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]){
+    FILE *fptr;
+    fptr = fopen(file_name,"w");
+    int i = 0;
+    printf("file size: %d\n",file_size);
+
+    while(i < file_size){
+        unsigned char type = file_content[i++];
+        if (type == 0){
+            int amount = file_content[i++];
+            fprintf(fptr,"%d ",amount);
+            int j;
+            for(j=0; j < amount-1 ; j++){
+                unsigned char first = file_content[i++];
+                unsigned char second = file_content[i++];
+                unsigned short num = (((unsigned short)first) << 8) | ((unsigned short)second);
+                fprintf(fptr,"%d ",num);
+            }
+            unsigned char first = file_content[i++];
+            unsigned char second = file_content[i++];
+            unsigned short num = ((unsigned short)first << 8) | (unsigned short)second;
+            fprintf(fptr,"%d\n",num);
+            
+        }else{
+            unsigned char amount_s[3];
+            amount_s[0] = file_content[i++];
+            amount_s[1] = file_content[i++];
+            amount_s[2] = file_content[i++];
+            int amount = atoi(amount_s);
+            fprintf(fptr,"%d ",amount);
+            int k;
+            while(file_content[i]!= 1 && file_content[i]!= 0){
+                if(file_content[i]!= ','){
+                    fprintf(fptr,"%c",file_content[i++]);
+                }else{
+                    fprintf(fptr,"%c",' ');
+                    i++;
+                }
+                
+            }
+            fprintf(fptr,"%c",'\n');
+
+        }
+    }
+
+    fclose(fptr);
+}
+
+void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]){
+    FILE *fptr;
+    fptr = fopen(file_name,"w");
+    int i = 0;
+    printf("file size: %d\n",file_size);
+
+    while(i < file_size){
+        unsigned char type = file_content[i++];
+        if (type == 0){
+            int amount = file_content[i++];
+            fprintf(fptr,"%d ",amount);
+            int j;
+            for(j=0; j < amount-1 ; j++){
+                unsigned char first = file_content[i++];
+                unsigned char second = file_content[i++];
+                unsigned short num = (((unsigned short)first) << 8) | ((unsigned short)second);
+                fprintf(fptr,"%d,",num);
+            }
+            unsigned char first = file_content[i++];
+            unsigned char second = file_content[i++];
+            unsigned short num = ((unsigned short)first << 8) | (unsigned short)second;
+            fprintf(fptr,"%d\n",num);
+            
+        }else{
+            unsigned char amount_s[3];
+            amount_s[0] = file_content[i++];
+            amount_s[1] = file_content[i++];
+            amount_s[2] = file_content[i++];
+            int amount = atoi(amount_s);
+            fprintf(fptr,"%d ",amount);
+            int k;
+            while(file_content[i]!= 1 && file_content[i]!= 0){
+                if(file_content[i]!= ','){
+                    fprintf(fptr,"%c",file_content[i++]);
+                }else{
+                    fprintf(fptr,"%c",' ');
+                    i++;
+                }
+                
             }
             fprintf(fptr,"%c",'\n');
 
