@@ -5,7 +5,7 @@
 #include <netinet/in.h> 
 #include <string.h>
 #include <stdbool.h>
-
+#include <errno.h>
 
 #define PORT 9080 
 const int NO_TRANS = 0;
@@ -18,12 +18,14 @@ const int FORMAT_ONE_AMOUNT_SIZE = 3;
 const char* FORMAT_ERROR_MESSAGE = "Format Error";
 const char* SUCCESS_MESSAGE = "Success";
 const int FOMRAT_ONE_AMOUNT_SIZE = 3;
+extern int errno;
 
 void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 void zero_to_one(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 bool is_valid_file(unsigned char file_content[], uint64_t file_size);
+void read_buffer(int socket, unsigned int total_bytes, void* destination); 
 
 int main(int argc, char const *argv[]) 
 { 
@@ -33,8 +35,7 @@ int main(int argc, char const *argv[])
     int addrlen = sizeof(address); 
     char buffer[1024] = {0}; 
     char *hello = "Hello from server"; 
-       
-    // Creating socket file descriptor 
+        
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
     { 
         perror("socket failed"); 
@@ -64,7 +65,8 @@ int main(int argc, char const *argv[])
         }
         int total_read = 0;
         uint32_t name_bytes;  
-        recv(new_socket, &name_bytes, sizeof(name_bytes), MSG_WAITALL);
+        //recv(new_socket, &name_bytes, sizeof(name_bytes), MSG_WAITALL);
+        read_buffer(new_socket, 4, &name_bytes);
         name_bytes = ntohl(name_bytes);
         printf("name bytes : %d\n", name_bytes);
         fflush(stdout);
@@ -72,13 +74,15 @@ int main(int argc, char const *argv[])
 
         unsigned char *name = malloc(name_bytes+1); 
         name[name_bytes] = '\0';
-        recv(new_socket, name, name_bytes, MSG_WAITALL);
+        //recv(new_socket, name, name_bytes, MSG_WAITALL);
+        read_buffer(new_socket, name_bytes, name);
         printf("name: %s\n", name);
         fflush(stdout);
         total_read += strlen(name);
 
         uint64_t content_bytes;  
-        int b = recv(new_socket, &content_bytes, sizeof(content_bytes), MSG_WAITALL);
+        //recv(new_socket, &content_bytes, sizeof(content_bytes), MSG_WAITALL);
+        read_buffer(new_socket, 8, &content_bytes);
         content_bytes = ntohl(content_bytes);
         printf("contnt bytes: %d\n", content_bytes);
         fflush(stdout);
@@ -86,13 +90,15 @@ int main(int argc, char const *argv[])
 
         unsigned char *content = malloc(content_bytes+1); 
         content[content_bytes] = '\0';
-        recv(new_socket, content, content_bytes, MSG_WAITALL);
+        //recv(new_socket, content, content_bytes, MSG_WAITALL);
+        read_buffer(new_socket, content_bytes, content);
         printf("content: %s\n", content);
         fflush(stdout);
         total_read += content_bytes;
 
         uint8_t to_format;
-        recv(new_socket, &to_format, 1, MSG_WAITALL);
+        //recv(new_socket, &to_format, 1, MSG_WAITALL);
+        read_buffer(new_socket, 1, &to_format);
         printf("to format before: %d\n", to_format);
         printf("to format: %d\n", to_format);
         fflush(stdout);
@@ -125,11 +131,6 @@ int main(int argc, char const *argv[])
             exit(EXIT_FAILURE);
         }
     }
-
-    valread = read( new_socket , buffer, 1024); 
-    printf("%s\n",buffer ); 
-    send(new_socket , hello , strlen(hello) , 0 ); 
-    printf("Hello message sent\n"); 
     return 0; 
 } 
 
@@ -351,4 +352,21 @@ bool is_valid_file(unsigned char file_content[], uint64_t file_size){
         }
     }
     return current == end_of_file;
+}
+
+void read_buffer(int socket, unsigned int total_bytes, void* destination){
+    int bytes_read = 0 ; 
+    int result; 
+    while(bytes_read < total_bytes){
+        result = read(socket,destination+bytes_read, total_bytes - bytes_read);
+        if(result < 1){
+            if (errno == EINTR){
+                result = 0;
+            }
+            perror(strerror(errno));
+            exit(-1);
+        }
+
+        bytes_read += result;
+    }
 }
