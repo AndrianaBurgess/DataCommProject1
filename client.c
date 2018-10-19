@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <inttypes.h>
+#include <errno.h>
 #include <arpa/inet.h>
 
 #define PORT 9080 
@@ -16,7 +17,12 @@
 #define CONTENT_SIZE_BYTES 8
 
 int size_of_message(char* file, char* new__file_name);
-   
+
+int write_buffer(int, void*, int);
+void read_buffer(int, void*); 
+
+extern int errno;
+
 int main(int argc, char *argv[]) 
 { 
     if(atoi(argv[4]) > 3 || atoi(argv[4]) < 0){
@@ -40,9 +46,8 @@ int main(int argc, char *argv[])
 
     struct sockaddr_in address; 
     int sock = 0, valread; 
-    struct sockaddr_in serv_addr; 
-    char *hello = "Hello from client"; 
-    char buffer[1024] = {0}; 
+    struct sockaddr_in serv_addr;  
+ 
     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
     { 
         printf("\n Socket creation error \n"); 
@@ -100,17 +105,15 @@ int main(int argc, char *argv[])
     uint8_t to_format = atoi(argv[TO_FORMAT_INDEX]);
     memcpy(curr,&to_format,1);
 
-    printf("to name: %d\n", message[s - 1]);
-
-    write(sock , message , s);
-    printf("Bytes sent: %d\n", s); 
+    write_buffer(sock , message , s);
     
-    char rec[40];
-    valread = read( sock , rec, 1024); 
-    printf("%s\n",rec ); 
+    char response[40];
+    read_buffer(sock, response);
+    puts(response);
     return 0; 
 } 
 
+//Computes the size of the protocol message
 int size_of_message(char* file, char* new__file_name){
     struct stat st;
     stat(file, &st);
@@ -119,3 +122,33 @@ int size_of_message(char* file, char* new__file_name){
     return(4+8+1+file_size+name_size);
 }
 
+
+int write_buffer(int socket, void* buffer , int total_bytes) {
+    while (total_bytes != 0){
+        int bytes_written = write(socket, buffer, total_bytes);
+        if (bytes_written < 0){
+            if (errno == EINTR){
+                bytes_written  = 0;
+            }
+            perror(strerror(errno));
+            exit(-1);
+        }
+        total_bytes -= bytes_written;
+        buffer += bytes_written;
+    }
+}
+
+void read_buffer(int socket, void* destination){
+    int bytes_read;
+    do {
+        bytes_read = read(socket, destination, 1);
+        if (bytes_read < 0){
+            if (errno == EINTR){
+                bytes_read = 0;
+            }
+            perror(strerror(errno));
+            exit(-1);
+        }
+        destination += bytes_read;
+    }while(bytes_read != 0);
+}

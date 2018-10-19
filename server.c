@@ -7,7 +7,6 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#define PORT 9080 
 const int NO_TRANS = 0;
 const int ZERO_TO_ONE = 1;
 const int ONE_TO_ZERO = 2;
@@ -26,6 +25,8 @@ void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char fi
 void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]);
 bool is_valid_file(unsigned char file_content[], uint64_t file_size);
 void read_buffer(int socket, unsigned int total_bytes, void* destination); 
+int write_buffer(int socket, const void* buffer , int total_bytes);
+unsigned char* add_leading_zeros(uint8_t number);
 
 int main(int argc, char const *argv[]) 
 { 
@@ -33,8 +34,6 @@ int main(int argc, char const *argv[])
     struct sockaddr_in address; 
     int opt = 1; 
     int addrlen = sizeof(address); 
-    char buffer[1024] = {0}; 
-    char *hello = "Hello from server"; 
         
     if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) 
     { 
@@ -44,7 +43,7 @@ int main(int argc, char const *argv[])
     
     address.sin_family = AF_INET; 
     address.sin_addr.s_addr = INADDR_ANY; 
-    address.sin_port = htons( PORT ); 
+    address.sin_port = htons( atoi(argv[1]) ); 
        
     if (bind(server_fd, (struct sockaddr *)&address,  
                                  sizeof(address))<0) 
@@ -63,55 +62,43 @@ int main(int argc, char const *argv[])
             perror("accept"); 
             exit(EXIT_FAILURE); 
         }
-        int total_read = 0;
+        //read the name size
         uint32_t name_bytes;  
-        //recv(new_socket, &name_bytes, sizeof(name_bytes), MSG_WAITALL);
         read_buffer(new_socket, 4, &name_bytes);
         name_bytes = ntohl(name_bytes);
-        printf("name bytes : %d\n", name_bytes);
         fflush(stdout);
-        total_read += sizeof(name_bytes);
-
+        
+        //read the name of the new file
         unsigned char *name = malloc(name_bytes+1); 
         name[name_bytes] = '\0';
-        //recv(new_socket, name, name_bytes, MSG_WAITALL);
         read_buffer(new_socket, name_bytes, name);
-        printf("name: %s\n", name);
         fflush(stdout);
-        total_read += strlen(name);
-
+        
+        //read the content size
         uint64_t content_bytes;  
-        //recv(new_socket, &content_bytes, sizeof(content_bytes), MSG_WAITALL);
         read_buffer(new_socket, 8, &content_bytes);
         content_bytes = ntohl(content_bytes);
-        printf("contnt bytes: %d\n", content_bytes);
         fflush(stdout);
-        total_read +=sizeof(content_bytes);
-
+       
+        //read the content of the file 
         unsigned char *content = malloc(content_bytes+1); 
         content[content_bytes] = '\0';
-        //recv(new_socket, content, content_bytes, MSG_WAITALL);
         read_buffer(new_socket, content_bytes, content);
-        printf("content: %s\n", content);
         fflush(stdout);
-        total_read += content_bytes;
-
+       
+        //read to format number 
         uint8_t to_format;
-        //recv(new_socket, &to_format, 1, MSG_WAITALL);
         read_buffer(new_socket, 1, &to_format);
-        printf("to format before: %d\n", to_format);
-        printf("to format: %d\n", to_format);
         fflush(stdout);
-        total_read += 1;
+    
 
         if (!is_valid_file(content, content_bytes)){
-            write(new_socket, FORMAT_ERROR_MESSAGE, strlen(FORMAT_ERROR_MESSAGE) );
+            write_buffer(new_socket, FORMAT_ERROR_MESSAGE, strlen(FORMAT_ERROR_MESSAGE) );
         }
         else{
 
-        write(new_socket, SUCCESS_MESSAGE, strlen(SUCCESS_MESSAGE));
+        write_buffer(new_socket, SUCCESS_MESSAGE, strlen(SUCCESS_MESSAGE));
 
-        printf("Total bytes read: %d\n", total_read);
         if (to_format == NO_TRANS){
             no_translation(name,content_bytes,content);
 
@@ -134,17 +121,18 @@ int main(int argc, char const *argv[])
     return 0; 
 } 
 
+
+//Does no changing, Just prints the file data depending on format type
 void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]){
     FILE *fptr;
     fptr = fopen(file_name,"w");
     int i = 0;
-    printf("file size: %d\n",file_size);
 
     while(i < file_size){
         unsigned char type = file_content[i++];
         if (type == 0){
             int amount = file_content[i++];
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",add_leading_zeros(amount));
             int j;
             for(j=0; j < amount-1 ; j++){
                 unsigned char first = file_content[i++];
@@ -162,8 +150,9 @@ void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char
             amount_s[0] = file_content[i++];
             amount_s[1] = file_content[i++];
             amount_s[2] = file_content[i++];
+            amount_s[3] = '\0';
             int amount = atoi(amount_s);
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",amount_s);
             int k;
             while(file_content[i]!= 1 && file_content[i]!= 0){
                 fprintf(fptr,"%c",file_content[i++]);
@@ -176,17 +165,17 @@ void no_translation(unsigned char file_name[], uint64_t file_size, unsigned char
     fclose(fptr);
 }
 
+//Changes format 0s to format 1
 void zero_to_one(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]){
     FILE *fptr;
     fptr = fopen(file_name,"w");
     int i = 0;
-    printf("file size: %d\n",file_size);
-
+    
     while(i < file_size){
         unsigned char type = file_content[i++];
         if (type == 0){
             int amount = file_content[i++];
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",add_leading_zeros(amount));
             int j;
             for(j=0; j < amount-1 ; j++){
                 unsigned char first = file_content[i++];
@@ -204,8 +193,9 @@ void zero_to_one(unsigned char file_name[], uint64_t file_size, unsigned char fi
             amount_s[0] = file_content[i++];
             amount_s[1] = file_content[i++];
             amount_s[2] = file_content[i++];
+            amount_s[3] = '\0';
             int amount = atoi(amount_s);
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",amount_s);
             int k;
             while(file_content[i]!= 1 && file_content[i]!= 0){
                 fprintf(fptr,"%c",file_content[i++]);
@@ -218,17 +208,17 @@ void zero_to_one(unsigned char file_name[], uint64_t file_size, unsigned char fi
     fclose(fptr);
 }
 
+//Changes format 1s to format zero
 void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]){
     FILE *fptr;
     fptr = fopen(file_name,"w");
     int i = 0;
-    printf("file size: %d\n",file_size);
 
     while(i < file_size){
         unsigned char type = file_content[i++];
         if (type == 0){
             int amount = file_content[i++];
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",add_leading_zeros(amount));
             int j;
             for(j=0; j < amount-1 ; j++){
                 unsigned char first = file_content[i++];
@@ -246,8 +236,9 @@ void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char fi
             amount_s[0] = file_content[i++];
             amount_s[1] = file_content[i++];
             amount_s[2] = file_content[i++];
+            amount_s[3] = '\0';
             int amount = atoi(amount_s);
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",amount_s);
             int k;
             while(file_content[i]!= 1 && file_content[i]!= 0){
                 if(file_content[i]!= ','){
@@ -266,17 +257,17 @@ void one_to_zero(unsigned char file_name[], uint64_t file_size, unsigned char fi
     fclose(fptr);
 }
 
+//Swaps the formats 
 void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_content[]){
     FILE *fptr;
     fptr = fopen(file_name,"w");
     int i = 0;
-    printf("file size: %d\n",file_size);
 
     while(i < file_size){
         unsigned char type = file_content[i++];
         if (type == 0){
             int amount = file_content[i++];
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",add_leading_zeros(amount));
             int j;
             for(j=0; j < amount-1 ; j++){
                 unsigned char first = file_content[i++];
@@ -294,8 +285,9 @@ void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_cont
             amount_s[0] = file_content[i++];
             amount_s[1] = file_content[i++];
             amount_s[2] = file_content[i++];
+            amount_s[3] = '\0';
             int amount = atoi(amount_s);
-            fprintf(fptr,"%d ",amount);
+            fprintf(fptr,"%s ",amount_s);
             int k;
             while(file_content[i]!= 1 && file_content[i]!= 0){
                 if(file_content[i]!= ','){
@@ -315,7 +307,7 @@ void swap(unsigned char file_name[], uint64_t file_size, unsigned char file_cont
 }
 
 
-
+//Checks to see if the file is valid 
 bool is_valid_file(unsigned char file_content[], uint64_t file_size){
 
     unsigned char* current = file_content;
@@ -343,10 +335,10 @@ bool is_valid_file(unsigned char file_content[], uint64_t file_size){
                     return false;
                 }
                 int difference = comma_ptr - current;
-                current += difference + 1; // go to 1 past comma
+                current += difference + 1;
             }
 
-            while (*current != 0 && *current != 1){ // iterate until finding next format byte
+            while (*current != 0 && *current != 1){
                 current++;
             }
         }
@@ -369,4 +361,38 @@ void read_buffer(int socket, unsigned int total_bytes, void* destination){
 
         bytes_read += result;
     }
+}
+
+int write_buffer(int socket, const void* buffer , int total_bytes) {
+    while (total_bytes != 0){
+        int bytes_written = write(socket, buffer, total_bytes);
+        if (bytes_written < 0){
+            if (errno == EINTR){
+                bytes_written  = 0;
+            }
+            perror(strerror(errno));
+            exit(-1);
+        }
+        total_bytes -= bytes_written;
+        buffer += bytes_written;
+    }
+}
+
+unsigned char* add_leading_zeros(uint8_t number) {
+    uint8_t num_digits = 0;
+    uint8_t num = number;
+    while (num != 0) {
+        num_digits++;
+        num /= 10;
+    }
+
+    char* str_num = malloc(4);
+    str_num[3] = '\0';
+    memset(str_num, '0', 3);
+    int index = 2;
+    for (int i = 0; i < num_digits; i++) {
+        str_num[index--] = (number % 10) + '0'; 
+        number /= 10;
+    }
+    return str_num;
 }
